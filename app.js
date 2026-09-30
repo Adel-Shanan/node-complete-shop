@@ -31,10 +31,12 @@ const MONGODB_URI =  `mongodb+srv://${process.env.MONGO_USER}:${process.env.MONG
 
 const app = express();
 
+/*
 const accessLogStream = fs.createWriteStream(
   path.join(__dirname, 'access.log'),
   {flags: 'a'}
 )
+*/
 
 app.use(
   helmet({
@@ -47,7 +49,7 @@ app.use(
   })
 );
 app.use(compression());
-app.use(morgan('combined', {stream: accessLogStream}));
+app.use(morgan('combined'));
 
 
 
