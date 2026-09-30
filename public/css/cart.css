@@ -1,0 +1,28 @@
+.cart__item-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  margin: auto;
+  width: 40rem;
+  max-width: 90%;
+}
+
+.cart__item {
+  display: grid;
+  grid-template-columns: 1fr minmax(120px, 200px) auto;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 1rem;
+  padding: 1rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.26);
+  margin-bottom: 1rem;
+
+}
+
+.cart__item h1 { margin: 0; font-size: 1.2rem; text-align: left; }
+.cart__item h2 { margin: 0; font-size: 1.2rem; text-align: center; }
+.cart__item button { justify-self: end; } 
+
+
+
