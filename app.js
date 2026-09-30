@@ -71,9 +71,10 @@ const store = new MongoDBStore({
 
 const csrfProtection = csrf();
 
+/*
 const privateKey = fs.readFileSync('server.key');
 const certificate = fs.readFileSync('server.cert');
-
+*/
 
 const imagesPath = path.join(__dirname, 'images');
 
@@ -242,10 +243,12 @@ app.use((error, req, res, next) => {
 
 
 
-mongoose.connect( MONGODB_URI )
-        .then(result => {
 
-          // this if you wanted to configure an ssl manually on our own but when depoly the host provider manage ssl will do that for us
+mongoose
+  .connect(MONGODB_URI)
+  .then(result => {
+
+    // this if you wanted to configure an ssl manually on our own but when depoly the host provider manage ssl will do that for us
           /* https.createServer({key: privateKey, cert: certificate}, app)
            .listen(process.env.PORT || 3000 , () => {
              console.log('Server running at http://localhost:3000');
@@ -253,9 +256,13 @@ mongoose.connect( MONGODB_URI )
            });
           */
 
-          app.listen(process.env.PORT || 3000 , () => {
-             console.log('Server running at http://localhost:3000');
 
-           });
-        })
-        .catch(err => console.log(err));
+    const PORT = process.env.PORT || 3000;
+
+    app.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`);
+    });
+  })
+  .catch(err => {
+    console.log(err);
+  });
