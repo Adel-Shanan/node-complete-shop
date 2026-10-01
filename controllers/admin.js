@@ -4,7 +4,6 @@ const cloudinary = require('../util/cloudinary');
 
 
 const { validationResult } = require('express-validator');
-const product = require('../models/product.js');
 
 
 exports.getAddProduct = (req, res , next ) => {
@@ -27,7 +26,7 @@ exports.getAddProduct = (req, res , next ) => {
 
 
 
-exports.postAddProduct =  (req, res , next ) => {
+exports.postAddProduct =  async (req, res , next ) => {
   
   //console.log(req.body);
 
@@ -90,37 +89,20 @@ exports.postAddProduct =  (req, res , next ) => {
 
   console.log(product);
 
-  product.save()
-         .then( result => {
-            //console.log('well....', result);
-            console.log('Product got created');
-            res.redirect('/admin/products');
-          })
-          .catch( err => {
-            // video 311
-            // return res.status(500).render('admin/edit-product.ejs', {
-            //       pageTitle:'Add a product',
-            //       path: '/admin/add-product',
-            //       editing: false,
-            //       hasError: true,
-            //       product: {
-            //         title: title,
-            //         price: price,
-            //         description: description
-            //       },
-            //       errorMessage: 'database operation fail, please try again later',
-            //       validationErrors: []
+  try{
 
-            //     });
-            //res.redirect('/500');
+    const result = await product.save();
 
+    //console.log('well....', result);
+    console.log('Product got created');
+    res.redirect('/admin/products');
 
-            //Well when we call next with an error passed as an argument, then we actually let express know that
-            // an error occurred and it will skip all other middlewares and move right away to an error handling
-            const error = new Error(err)
-            error.httpStatusCode = 500;
-            return next(error)
-          });
+  }
+  catch( err ) {
+    const error = new Error(err)
+    error.httpStatusCode = 500;
+    return next(error)
+  };
 
 };
 
@@ -135,7 +117,7 @@ exports.postAddProduct =  (req, res , next ) => {
 
 
 
-exports.getEditProduct = (req, res , next ) => {
+exports.getEditProduct = async (req, res , next ) => {
 
   const editMode = req.query.edit;
   //console.log(editMode);
@@ -147,8 +129,10 @@ exports.getEditProduct = (req, res , next ) => {
 
   const prodId = req.params.productId;
 
-  Product.findById(prodId)
-  .then( product => {
+  try {
+    
+    const product = await Product.findById(prodId);
+  
     if(!product){
       return res.redirect('/');
     }
@@ -164,14 +148,14 @@ exports.getEditProduct = (req, res , next ) => {
 
 
     });
-  })
-  .catch( err => {
+  }
+  catch( err ){
     //Well when we call next with an error passed as an argument, then we actually let express know that
     // an error occurred and it will skip all other middlewares and move right away to an error handling
     const error = new Error(err)
     error.httpStatusCode = 500;
     return next(error)
-  } );
+  }
 
 };
 
@@ -184,7 +168,7 @@ exports.getEditProduct = (req, res , next ) => {
 
 
 
-exports.postEditProduct = (req, res, next) => {
+exports.postEditProduct = async (req, res, next) => {
   
   const prodId = req.body.productId;
   const updatedTitle = req.body.title;
@@ -214,46 +198,44 @@ exports.postEditProduct = (req, res, next) => {
     });
   }
 
-  Product.findById(prodId)
-    .then( product => {
+  try {
+    const product = await Product.findById(prodId);
+  
+    if (!product) {
+      return next(new Error('Product not found!'));
+    }
 
-      // to ensure that only the same user who added the product can make post edit to the product
-      if( toString(product.userId) !== toString(req.user._id) ){
-        return res.redirect('/');
-      }
+    // to ensure that only the same user who added the product can make post edit to the product
+    if (product.userId.toString() !== req.user._id.toString()) {
+      return res.redirect('/');
+    }
 
-      product.title = updatedTitle;
+    product.title = updatedTitle;
+    product.price = updatedPrice;
+    product.description = updatedDescription;
 
-      // if no new image was passed or the new uploaded file was not image we simply dont set it on the object
-      if (updatedImage) {
-        return cloudinary.uploader.destroy(product.imagePublicId)
-        .then(result => {
-          product.imageUrl = updatedImage.path;
-          product.imagePublicId = updatedImage.filename;
-          product.price = updatedPrice;
-          product.description = updatedDescription;
+    // if no new image was passed or the new uploaded file was not image we simply dont set it on the object
+    if (updatedImage) {
+      const result = await cloudinary.uploader.destroy(product.imagePublicId);
+        
+      product.imageUrl = updatedImage.path;
+      product.imagePublicId = updatedImage.filename;
 
-          return product.save();
-        });
-      }
+    }
 
-      product.price = updatedPrice;
-      product.description = updatedDescription;
-
-      return product.save()
+    const result = await product.save();
                     
-    })
-    .then( result => {
-      //console.log(result);
-      res.redirect('/admin/products');
-    })
-    .catch( err => {
+    //console.log(result);
+    res.redirect('/admin/products');
+  
+  }
+    catch( err ) {
       //Well when we call next with an error passed as an argument, then we actually let express know that
       // an error occurred and it will skip all other middlewares and move right away to an error handling
       const error = new Error(err)
       error.httpStatusCode = 500;
       return next(error)
-    });
+    }
 };
 
 
@@ -271,46 +253,37 @@ exports.postEditProduct = (req, res, next) => {
 
 
 
-
-
-
-
-exports.postDeleteProduct = (req, res, next ) => {
+exports.postDeleteProduct = async (req, res, next ) => {
 
   const prodId = req.body.productId;
   
   // this for deleting the image of the product ( added on video 334 )
-  product.findById(prodId)
-  .then(product => {
+  
+  try {
+    const product = await Product.findById(prodId);
 
     if(!product){
       return next(new Error('Product not found!'));
     }
 
 
-    return cloudinary.uploader.destroy(product.imagePublicId)
-  })
-  .then( result => {
-    return Product.deleteOne({_id: prodId, userId: req.user._id}) // deleting product from the shop
+    const result = await cloudinary.uploader.destroy(product.imagePublicId);
+  
+    const deleting_result = await Product.deleteOne({_id: prodId, userId: req.user._id}); // deleting product from the shop
 
-  })
-  .then(result => {
-    return req.user.deleteFromCart(prodId);  // deleting product from the cart if existed
-  })
-  .then( result => {
+    const deleting_from_cart_result = await req.user.deleteFromCart(prodId);  // deleting product from the cart if existed
+  
     console.log('Product got destroyed... from the Controller');
+
     res.redirect('/admin/products');
-  })
-  .catch( err => {
+  }
+  catch( err ) {
     //Well when we call next with an error passed as an argument, then we actually let express know that
     // an error occurred and it will skip all other middlewares and move right away to an error handling
     const error = new Error(err)
     error.httpStatusCode = 500;
     return next(error)
-  });
-
-
-
+  }
 
 };
 
@@ -321,42 +294,34 @@ exports.postDeleteProduct = (req, res, next ) => {
 
 
 
-
-
-
-
-exports.deleteProduct = (req, res, next ) => {
+exports.deleteProduct = async (req, res, next ) => {
 
   const prodId = req.params.productId;
   
-  // this for deleting the image of the product ( added on video 334 )
-  product.findById(prodId)
-  .then(product => {
+  try {
 
+    // this for deleting the image of the product ( added on video 334 )
+
+    const product = await Product.findById(prodId);
+  
     if(!product){
       return next(new Error('Product not found!'));
     }
-    // remember this is from util folder
     
-    return cloudinary.uploader.destroy(product.imagePublicId)
 
-  })
-  .then(result => {
-    return Product.deleteOne({_id: prodId, userId: req.user._id}) // deleting product from the shop
-  })
-  .then(result => {
-    return req.user.deleteFromCart(prodId);  // deleting product from the cart if existed
-  })
-  .then( result => {
+    const result = await cloudinary.uploader.destroy(product.imagePublicId);
+  
+    const deleting_result = await Product.deleteOne({_id: prodId, userId: req.user._id}); // deleting product from the shop
+
+    const deleting_from_cart_result = await req.user.deleteFromCart(prodId);  // deleting product from the cart if existed
+  
     console.log('Product got destroyed... from the Controller');
     res.status(200).json({message: 'Success'});
-  })
-  .catch( err => {
+    
+  }
+  catch( err ) {
     res.status(500).json({message: 'deleting product failed'});
-  });
-
-
-
+  };
 
 };
 
@@ -391,30 +356,28 @@ exports.deleteProduct = (req, res, next ) => {
 
 
 
-
-
-
-exports.getProducts = (req, res , next ) => {
+exports.getProducts = async (req, res , next ) => {
   
+
+  try {
+
   // we added restriction {userId: req.user._id} so that only users who created the product can edit or delete it 
 
-  Product.find({userId: req.user._id})
-  //.select('title price -_id') // populate and select got mentioned in video 221
-  //.populate('userId', 'name')
-  .then( products => {
+  const products = await Product.find({userId: req.user._id}); /* .select('title price -_id').populate('userId', 'name'); */ // populate and select got mentioned in video 221
     //console.log(products);
     res.render('admin/products.ejs', {
       prods: products,
       pageTitle:'Admin Products',
       path: '/admin/products'
     });
-  })
-  .catch( err => {
+
+  }
+  catch( err ) {
       //Well when we call next with an error passed as an argument, then we actually let express know that
       // an error occurred and it will skip all other middlewares and move right away to an error handling
       const error = new Error(err)
       error.httpStatusCode = 500;
       return next(error)
-    });
+    };
   
 };

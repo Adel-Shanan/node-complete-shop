@@ -1,8 +1,6 @@
 require('dotenv').config();
 
 const path = require('path');
-const fs = require('fs')
-
 
 const express = require('express');
 const bodyParser = require('body-parser');
@@ -35,12 +33,6 @@ const MONGODB_URI =  `mongodb+srv://${process.env.MONGO_USER}:${process.env.MONG
 
 const app = express();
 
-/*
-const accessLogStream = fs.createWriteStream(
-  path.join(__dirname, 'access.log'),
-  {flags: 'a'}
-)
-*/
 
 app.use(helmet(
   {
@@ -69,7 +61,6 @@ though it's not set by default, expressjs will actually use that by default to d
 the environment mode and if you set that to production, expressjs will change certain things
 and for example, it will reduce the details for errors it throws and in general, optimize some things for deployment.
 and again hosting providers typically do that for you.*/
-
 console.log(process.env.NODE_ENV);
 
 
@@ -80,11 +71,6 @@ const store = new MongoDBStore({
 
 
 const csrfProtection = csrf();
-
-/*
-const privateKey = fs.readFileSync('server.key');
-const certificate = fs.readFileSync('server.cert');
-*/
 
 
 const storage = new CloudinaryStorage({
@@ -131,9 +117,6 @@ app.use((req, res, next) => {
   res.locals.csrfToken = req.csrfToken();
   next();
 })
-
-
-
 
 
 
@@ -238,6 +221,8 @@ mongoose
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
     });
+
+    
   })
   .catch(err => {
     console.log(err);

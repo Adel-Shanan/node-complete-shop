@@ -7,27 +7,24 @@ const PDFDocument = require('pdfkit');
 
 const Product = require('../models/product.js');
 const Order = require('../models/order.js');
-const product = require('../models/product.js');
-const { or } = require('sequelize');
 
 const ITEMS_PER_PAGE = 1;
 
 
-exports.getProducts = (req, res , next ) => {
+exports.getProducts = async (req, res , next ) => {
+
 
  
   const page = +req.query.page || 1;
   let totalItems;
 
-  Product.find()
-  .countDocuments()
-  .then(numProducts => {
+  try {
+
+    const numProducts = await Product.find().countDocuments();
+
     totalItems = numProducts;
-    return product.find()
-    .skip( (page - 1) * ITEMS_PER_PAGE )
-    .limit(ITEMS_PER_PAGE);
-  })
-  .then( products => {
+
+    const products = await Product.find().skip( (page - 1) * ITEMS_PER_PAGE ).limit(ITEMS_PER_PAGE);
 
     res.render('shop/products-list.ejs', {
       prods: products,
@@ -40,14 +37,16 @@ exports.getProducts = (req, res , next ) => {
       previousPage: page - 1,
       lastPage: Math.ceil(totalItems / ITEMS_PER_PAGE)
     });
-  })
-  .catch( err => {
+    
+  }
+
+  catch( err ) {
     //Well when we call next with an error passed as an argument, then we actually let express know that
     // an error occurred and it will skip all other middlewares and move right away to an error handling
     const error = new Error(err)
     error.httpStatusCode = 500;
     return next(error)
-  });
+  }
   
 };
 
@@ -69,25 +68,26 @@ exports.getProducts = (req, res , next ) => {
 
 
 
-exports.getProduct = (req, res, next ) => {
+exports.getProduct = async (req, res, next ) => {
   const prodId = req.params.productId;
 
-  Product.findById(prodId)
-  .then( product => {
+  try {
+    const product = await Product.findById(prodId);
     
     res.render('shop/product-details.ejs', {
       product: product,
       pageTitle: product.title + ' Details',
       path: '/products'
     });
-  })
-  .catch( err => {
+  }
+
+  catch( err ) {
     //Well when we call next with an error passed as an argument, then we actually let express know that
     // an error occurred and it will skip all other middlewares and move right away to an error handling
     const error = new Error(err)
     error.httpStatusCode = 500;
     return next(error)
-  });
+  }
 
 };
 
@@ -106,21 +106,18 @@ exports.getProduct = (req, res, next ) => {
 
 
 
-exports.getIndex =  (req, res , next ) => {
+exports.getIndex =  async (req, res , next ) => {
 
   const page = +req.query.page || 1;
   let totalItems;
 
-  Product.find()
-  .countDocuments()
-  .then(numProducts => {
-    totalItems = numProducts;
-    return product.find()
-    .skip( (page - 1) * ITEMS_PER_PAGE )
-    .limit(ITEMS_PER_PAGE);
-  })
-  .then( products => {
+  try { 
+    const numProducts = await Product.find().countDocuments();
 
+    totalItems = numProducts;
+
+    const products = await Product.find().skip( (page - 1) * ITEMS_PER_PAGE ).limit(ITEMS_PER_PAGE);
+ 
     res.render('shop/index.ejs', {
       prods: products,
       pageTitle:'Shop',
@@ -132,14 +129,14 @@ exports.getIndex =  (req, res , next ) => {
       previousPage: page - 1,
       lastPage: Math.ceil(totalItems / ITEMS_PER_PAGE)
     });
-  })
-  .catch( err => {
+  }
+  catch( err ) {
     //Well when we call next with an error passed as an argument, then we actually let express know that
     // an error occurred and it will skip all other middlewares and move right away to an error handling
     const error = new Error(err)
     error.httpStatusCode = 500;
     return next(error)
-  });
+  };
   
 };
 
@@ -160,9 +157,11 @@ exports.getIndex =  (req, res , next ) => {
 
 
 
-exports.getCart = (req, res, next) => {
-  req.user.populate('cart.items.productId')
-  .then(user => {
+exports.getCart = async (req, res, next) => {
+
+  try {
+    const user = await req.user.populate('cart.items.productId');
+    
     const products = user.cart.items;
     //console.log(products);
     res.render('shop/cart.ejs', {
@@ -170,33 +169,34 @@ exports.getCart = (req, res, next) => {
       path: '/cart',
       products: products
     });
-  })
-  .catch( err => {
+  }
+  catch( err ) {
     //Well when we call next with an error passed as an argument, then we actually let express know that
     // an error occurred and it will skip all other middlewares and move right away to an error handling
     const error = new Error(err)
     error.httpStatusCode = 500;
     return next(error)
-  });
+  };
 
   // My approach by implementing my own method in the user model to load the cart 
 
-  // req.user.getCart()
-  // .then(products => {
-  //   //console.log(products);
+  // try { 
+  // const products = await req.user.getCart();
+
   //   res.render('shop/cart.ejs', {
   //     pageTitle:'Your Cart',
   //     path: '/cart',
   //     products: products
   //   });
-  // })
-  // .catch( err => {
+  // }
+
+  //  catch( err ) {
   //  //Well when we call next with an error passed as an argument, then we actually let express know that
   //  // an error occurred and it will skip all other middlewares and move right away to an error handling
   //  const error = new Error(err)
   //  error.httpStatusCode = 500;
   //  return next(error)
-  // });
+  // };
 
 
 };
@@ -220,23 +220,24 @@ exports.getCart = (req, res, next) => {
 
 
 
-exports.postCart = (req, res, next) => {
+exports.postCart = async (req, res, next) => {
   const prodId = req.body.productId;
-  Product.findById(prodId)
-         .then(product => {
-            return req.user.addToCart(product);
-         })
-         .then(result => {
-          console.log(result);
-          res.redirect('/cart');
-         })
-         .catch( err => {
-            //Well when we call next with an error passed as an argument, then we actually let express know that
-            // an error occurred and it will skip all other middlewares and move right away to an error handling
-            const error = new Error(err)
-            error.httpStatusCode = 500;
-            return next(error)
-          });
+
+  try { 
+    const product = await Product.findById(prodId);
+    
+    const result = await req.user.addToCart(product);
+
+    console.log(result);
+    res.redirect('/cart');
+  }
+  catch( err )  {
+    //Well when we call next with an error passed as an argument, then we actually let express know that
+    // an error occurred and it will skip all other middlewares and move right away to an error handling
+    const error = new Error(err)
+    error.httpStatusCode = 500;
+    return next(error)
+  };
 
 };
 
@@ -255,70 +256,70 @@ exports.postCart = (req, res, next) => {
 
 
 
-exports.postCartDeleteProduct = (req, res, next) => {
+exports.postCartDeleteProduct = async (req, res, next) => {
+
   const prodId = req.body.productId;
-  req.user.deleteFromCart(prodId)
-    .then(result => {
-      //console.log(result);
-      res.redirect('/cart');
+
+  try {
+    const result = await req.user.deleteFromCart(prodId);
+  
+    //console.log(result);
+    res.redirect('/cart');
+  }
+  catch( err ) {
+    //Well when we call next with an error passed as an argument, then we actually let express know that
+    // an error occurred and it will skip all other middlewares and move right away to an error handling
+    const error = new Error(err)
+    error.httpStatusCode = 500;
+    return next(error)
+  };
+
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+exports.getCheckoutSuccess = async (req, res, next) => {
+
+  try { 
+    const user = await req.user.populate('cart.items.productId');
+
+    const products = user.cart.items.map(i => {
+      return ({ product: { ...i.productId }, quantity: i.quantity }); // here productId  is the name of the whole product data because we named it like that in the user model .. just to keep in mind 
     })
-    .catch( err => {
-      //Well when we call next with an error passed as an argument, then we actually let express know that
-      // an error occurred and it will skip all other middlewares and move right away to an error handling
-      const error = new Error(err)
-      error.httpStatusCode = 500;
-      return next(error)
+      
+    const order = new Order({ 
+      user: {
+        email: req.user.email,
+        userId: req.user._id
+      },
+      items: products
     });
 
-};
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-exports.getCheckoutSuccess = (req, res, next) => {
-
-  req.user.populate('cart.items.productId')
-     .then(user => {
-      const products = user.cart.items.map(i => {
-        return ({ product: { ...i.productId }, quantity: i.quantity }); // here productId  is the name of the whole product data because we named it like that in the user model .. just to keep in mind 
-      })
-      return products;
-     })
-     .then(products =>{
-      const order = new Order({ 
-        user: {
-          email: req.user.email,
-          userId: req.user._id
-        },
-        items: products
-      });
-
-      return order.save();
-     })
-     .then(result => {
-      req.user.cart = { items: [] };
-      return req.user.save();
-     })
-     .then(result => {
-      res.redirect('/orders');
-     })
-     .catch( err => {
-        //Well when we call next with an error passed as an argument, then we actually let express know that
-        // an error occurred and it will skip all other middlewares and move right away to an error handling
-        const error = new Error(err)
-        error.httpStatusCode = 500;
-        return next(error)
-      });
+    const result = await order.save();
+  
+    req.user.cart = { items: [] };
+    const result2 = await req.user.save();
+    
+    res.redirect('/orders');
+  }
+  catch( err )  {
+    //Well when we call next with an error passed as an argument, then we actually let express know that
+    // an error occurred and it will skip all other middlewares and move right away to an error handling
+    const error = new Error(err)
+    error.httpStatusCode = 500;
+    return next(error)
+  };
 };
 
 
@@ -343,76 +344,37 @@ exports.getCheckoutSuccess = (req, res, next) => {
 
 
 // after video 357 we didnt use it , although we copu paste it and named it getCheckoutSuccess
-exports.postOrder = (req, res, next) => {
+exports.postOrder = async (req, res, next) => {
 
-  req.user.populate('cart.items.productId')
-     .then(user => {
-      const products = user.cart.items.map(i => {
+  try { 
+    const user = await req.user.populate('cart.items.productId');
+
+    const products = user.cart.items.map(i => {
         return ({ product: { ...i.productId }, quantity: i.quantity }); // here productId  is the name of the whole product data because we named it like that in the user model .. just to keep in mind 
       })
-      return products;
-     })
-     .then(products =>{
-      const order = new Order({ 
-        user: {
-          email: req.user.email,
-          userId: req.user._id
-        },
-        items: products
-      });
 
-      return order.save();
-     })
-     .then(result => {
-      req.user.cart = { items: [] };
-      return req.user.save();
-     })
-     .then(result => {
-      res.redirect('/orders');
-     })
-     .catch( err => {
-        //Well when we call next with an error passed as an argument, then we actually let express know that
-        // an error occurred and it will skip all other middlewares and move right away to an error handling
-        const error = new Error(err)
-        error.httpStatusCode = 500;
-        return next(error)
-      });
-};
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-exports.getOrders = (req, res, next) => {
-  Order.find({ 'user.userId': req.user._id })
-    .then(orders => {
-      console.log(orders);
-      res.render('shop/orders.ejs', {
-        pageTitle:'Your Orders',
-        path: '/orders',
-        orders: orders
-      });
-    })
-    .catch( err => {
-      //Well when we call next with an error passed as an argument, then we actually let express know that
-      // an error occurred and it will skip all other middlewares and move right away to an error handling
-      const error = new Error(err)
-      error.httpStatusCode = 500;
-      return next(error)
+    const order = new Order({ 
+      user: {
+        email: req.user.email,
+        userId: req.user._id
+      },
+      items: products
     });
 
+    const result = await order.save();
+  
+    req.user.cart = { items: [] };
+    const result2 = await req.user.save();
+  
+    res.redirect('/orders');
+  }
+  catch( err ) {
+    //Well when we call next with an error passed as an argument, then we actually let express know that
+    // an error occurred and it will skip all other middlewares and move right away to an error handling
+    const error = new Error(err)
+    error.httpStatusCode = 500;
+    return next(error)
+  }
 };
 
 
@@ -428,12 +390,52 @@ exports.getOrders = (req, res, next) => {
 
 
 
-exports.getCheckout = (req, res, next) => {  
+
+
+
+exports.getOrders = async (req, res, next) => {
+
+  try { 
+
+    const orders = await Order.find({ 'user.userId': req.user._id });
+  
+    console.log(orders);
+    res.render('shop/orders.ejs', {
+      pageTitle:'Your Orders',
+      path: '/orders',
+      orders: orders
+    });
+  }
+  catch( err ) {
+    //Well when we call next with an error passed as an argument, then we actually let express know that
+    // an error occurred and it will skip all other middlewares and move right away to an error handling
+    const error = new Error(err)
+    error.httpStatusCode = 500;
+    return next(error)
+  };
+
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+exports.getCheckout = async (req, res, next) => {  
   let products;
   let total = 0;
 
-  req.user.populate('cart.items.productId')
-  .then(user => {
+  try { 
+
+    const user = await req.user.populate('cart.items.productId');
 
     products = user.cart.items;
     total = 0;
@@ -442,7 +444,8 @@ exports.getCheckout = (req, res, next) => {
       total += p.quantity * p.productId.price;
     });
 
-    return stripe.checkout.sessions.create({
+    const session = await stripe.checkout.sessions.create({
+
       payment_method_types: ['card'],
       mode: 'payment',
       line_items: products.map(p => {
@@ -474,27 +477,24 @@ exports.getCheckout = (req, res, next) => {
       cancel_url: req.protocol + '://' + req.get('host') + '/checkout/cancel'
     });
 
-  })
-  .then( session => {
-    
-      res.render('shop/checkout.ejs', {
-        pageTitle:'Checkout',
-        path: '/checkout',
-        products: products,
-        totalSum: total,
-        sessionId: session.id,
-        stripePublishableKey: process.env.STRIPE_PUBLISH_KEY
-      });
+    res.render('shop/checkout.ejs', {
+      pageTitle:'Checkout',
+      path: '/checkout',
+      products: products,
+      totalSum: total,
+      sessionId: session.id,
+      stripePublishableKey: process.env.STRIPE_PUBLISH_KEY
+    });
 
-  })
-  .catch(err => {
+  }
+  catch(err )  {
       //Well when we call next with an error passed as an argument, then we actually let express know that
       // an error occurred and it will skip all other middlewares and move right away to an error handling
       console.log(err);
       const error = new Error(err)
       error.httpStatusCode = 500;
       return next(error)
-  });
+  };
 };
 
 
@@ -506,11 +506,13 @@ exports.getCheckout = (req, res, next) => {
 
 
 
-exports.getInvoice = (req, res, next) => {
+exports.getInvoice = async (req, res, next) => {
 
   const orderId = req.params.orderId;
   
-  Order.findById(orderId).then(order=>{
+  try { 
+    const order = await Order.findById(orderId);
+    
     if(!order){
       return next(new Error('No order Found'));
     }
@@ -521,27 +523,7 @@ exports.getInvoice = (req, res, next) => {
 
     const invoiceName = 'invoice-' + orderId + '.pdf';
     const invoicePath = path.join('data', 'invoices', invoiceName);
-
     
-    // fs.readFile(invoicePath, (err, data) => {
-    //   if (err) {
-    //     return next(err);
-    //   }
-
-    //   console.log('send');
-    //   res.setHeader('Content-Type', 'application/pdf');
-    //   res.setHeader('Content-Disposition', 'inline; filename="' + invoiceName + '"')
-    //   res.send(data);
-    // });
-
-
-    /* ⚠️
-      The upper approach loads the entire file into memory before sending the response,
-      which can be inefficient for large files. Instead, we'll use streaming to
-      read and send the file in small chunks, reducing memory usage.
-    */
-
-      
     const pdfDoc = new PDFDocument(); // its a readable stream
 
     res.setHeader('Content-Type', 'application/pdf');
@@ -570,6 +552,9 @@ exports.getInvoice = (req, res, next) => {
     //const file = fs.createReadStream(invoicePath); // with that node will be able to read in the file step by step in different chunks
     //file.pipe(res); // not every object is a writable stream but (res) happens to be one 
  
-  }).catch(err => next(err));
+  }
+  catch (err) {
+     next(err)
+  }
 
 };

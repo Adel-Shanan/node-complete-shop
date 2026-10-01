@@ -7,7 +7,6 @@ const sendgridTransport = require('nodemailer-sendgrid-transport');
 const { validationResult } = require('express-validator');
 
 const User = require('../models/user');
-const { error } = require('console');
 
 
 const transport = nodemailer.createTransport(sendgridTransport({
@@ -94,7 +93,7 @@ exports.getSignup = (req, res , next ) => {
 
 
 
-exports.postLogin = (req, res , next ) => {
+exports.postLogin = async (req, res , next ) => {
     const email = req.body.email;
     const password = req.body.password;
 
@@ -114,64 +113,63 @@ exports.postLogin = (req, res , next ) => {
         });
     }
 
-    User.findOne({email: email})
-        .then(user => {
-            if(!user){                
-                return res.status(422).render('auth/login.ejs', {
-                    pageTitle:'login Page',
-                    path: '/login',
-                    errorMessage: 'invalid email or password',
-                    oldInput: { 
-                        email: email,
-                        password: password,
-                    },
-                    validationErrors: [{path: 'email'}, {path: 'password'}]
-                });
-            }
-                
+    try {
+        const user = await User.findOne({email: email});
+    
+        if(!user){                
+            return res.status(422).render('auth/login.ejs', {
+                pageTitle:'login Page',
+                path: '/login',
+                errorMessage: 'invalid email or password',
+                oldInput: { 
+                    email: email,
+                    password: password,
+                },
+                validationErrors: [{path: 'email'}, {path: 'password'}]
+            });
+        }
+            
 
-            bcrypt.compare(password, user.password)
-            .then(doMatch => {
-                if(doMatch){
-                            
-                    req.session.isLoggedIn = true;
-                    req.session.user = user;
+        const doMatch = await bcrypt.compare(password, user.password);
+        
+        if(!doMatch){
+                    
+             return res.status(422).render('auth/login.ejs', {
+                pageTitle:'login Page',
+                path: '/login',
+                errorMessage: 'invalid email or password',
+                oldInput: { 
+                    email: email,
+                    password: password,
+                    confirmPassword:req.body.confirmPassword
+                },
+                validationErrors: [{path: 'email'}, {path: 'password'}]
+            });
 
-                    // we should return this to avoid code excecution of line ( res.redirect('/login') ) which is under
-                    // because the callback in save will excute asynchronously
+        }
+    
+        req.session.isLoggedIn = true;
+        req.session.user = user;
 
-                    // honestly i should understand the return and promises things in js
-                    return req.session.save((err) => {
-                        console.log(err);
-                        res.redirect('/');
-                    });
-                }
-
-                return res.status(422).render('auth/login.ejs', {
-                    pageTitle:'login Page',
-                    path: '/login',
-                    errorMessage: 'invalid email or password',
-                    oldInput: { 
-                        email: email,
-                        password: password,
-                        confirmPassword:req.body.confirmPassword
-                    },
-                    validationErrors: [{path: 'email'}, {path: 'password'}]
-                });
-            })
-            .catch(err => {
+    
+        return req.session.save( err => {
+            if(err) {
                 console.log(err);
-                res.redirect('/login');
-            })
+                return next(err);
+            }
 
-    })
-    .catch( err => {
+            return res.redirect('/');            
+        });
+
+        
+    }
+    catch ( err ) {
       //Well when we call next with an error passed as an argument, then we actually let express know that
       // an error occurred and it will skip all other middlewares and move right away to an error handling
       const error = new Error(err)
       error.httpStatusCode = 500;
       return next(error)
-    });
+    };
 };
 
 
@@ -188,7 +186,8 @@ exports.postLogin = (req, res , next ) => {
 
 
 
-exports.postSignup = (req, res , next ) => {
+exports.postSignup = async (req, res , next ) => {
+
     //make sure you check your view, how these inputs are named because you retrieve the values on request body by these names,
     const email = req.body.email;
     const password = req.body.password;
@@ -211,33 +210,35 @@ exports.postSignup = (req, res , next ) => {
         });
     }
     
-    // this is an asynchronous task and therefore this gives us back a promise
-    bcrypt.hash(password, 12)
-    .then(hashedPassword => {    // here we have nestedpromiese for not having error if email already in database
+    try { 
+
+        // this is an asynchronous task and therefore this gives us back a promise
+        const hashedPassword = await bcrypt.hash(password, 12);
+
         const user = new User({
             email: email,
             password: hashedPassword,
             cart: {items: []}
         });
-        return user.save();
-    })
-    .then(result => {
+        const result = await user.save();
+    
         
-        res.redirect('/login')
-        return transport.sendMail({
+        await transport.sendMail({
             to: email,
             from: 'robo513adel@gmail.com', // i have to use the verified email in sendgrid حصرا
             subject: 'Signup done duuuuude!',
             html: '<h1>you truly are member of us now duddde</h1>'
         });
-    })
-    .catch( err => {
+
+        return res.redirect('/login');
+    }
+    catch( err )  {
       //Well when we call next with an error passed as an argument, then we actually let express know that
       // an error occurred and it will skip all other middlewares and move right away to an error handling
       const error = new Error(err)
       error.httpStatusCode = 500;
       return next(error)
-    });
+    };
 
 };
 
@@ -303,8 +304,9 @@ exports.getReset = (req, res, next) => {
 
 
 
-exports.postReset = (req, res, next) => {
-    crypto.randomBytes(32, (err, buffer) => {
+exports.postReset = async (req, res, next) => {
+
+    crypto.randomBytes(32, async (err, buffer) => {
         if(err){
             console.log(err);
             return res.redirect('/reset')
@@ -312,20 +314,18 @@ exports.postReset = (req, res, next) => {
 
         const token = buffer.toString('hex');
 
-        User.findOne({email: req.body.email})
-        .then(user => {
+        try { 
+            const user = await User.findOne({email: req.body.email});
+            
             if(!user){
                 req.flash('error', 'No account with that email found');
                 return res.redirect('/reset');
             }
             user.resetToken = token;
             user.resetTokenExpiration = Date.now() + 3600000;
-            return user.save(); 
+            const result = await user.save(); 
 
-        })
-        .then(result => {
-            res.redirect('/')
-            transport.sendMail({
+            const result2 = await transport.sendMail({
                 to: req.body.email,
                 from: 'robo513adel@gmail.com', // i have to use the verified email in sendgrid حصرا
                 subject: 'this email because you cant remmember your password duh!',
@@ -334,14 +334,16 @@ exports.postReset = (req, res, next) => {
                     <p> Click here <a href="http://localhost:3000/reset/${token}">Link</a> to set a new Password</p>
                 `
             });
-        })
-        .catch( err => {
+            
+            res.redirect('/')
+        }
+        catch( err ) {
             //Well when we call next with an error passed as an argument, then we actually let express know that
             // an error occurred and it will skip all other middlewares and move right away to an error handling
             const error = new Error(err)
             error.httpStatusCode = 500;
             return next(error)
-        });
+        };
     });
 };
 
@@ -357,11 +359,13 @@ exports.postReset = (req, res, next) => {
 
 
 
-exports.getNewPassword = (req, res, next) => {
+exports.getNewPassword = async (req, res, next) => {
 
-    const token = req.params.token;
-    User.findOne({ resetToken: token, resetTokenExpiration: {$gt: Date.now() } })
-        .then(user => {
+    try { 
+
+        const token = req.params.token;
+    
+        const user = await User.findOne({ resetToken: token, resetTokenExpiration: {$gt: Date.now() } })
 
             let message = req.flash('error');
             console.log(message);
@@ -382,14 +386,15 @@ exports.getNewPassword = (req, res, next) => {
                 userId: user._id.toString(),
                 passwordToken: token
             });
-        })
-        .catch( err => {
-      //Well when we call next with an error passed as an argument, then we actually let express know that
-      // an error occurred and it will skip all other middlewares and move right away to an error handling
-      const error = new Error(err)
-      error.httpStatusCode = 500;
-      return next(error)
-    });
+    }
+
+    catch( err ) {
+        //Well when we call next with an error passed as an argument, then we actually let express know that
+        // an error occurred and it will skip all other middlewares and move right away to an error handling
+        const error = new Error(err)
+        error.httpStatusCode = 500;
+        return next(error)
+    };
 
 };
 
@@ -404,7 +409,7 @@ exports.getNewPassword = (req, res, next) => {
 
 
 
-exports.postNewPassword = (req, res, next) => {
+exports.postNewPassword = async (req, res, next) => {
 
     const newPassword = req.body.password;
     const userId = req.body.userId;
@@ -412,26 +417,28 @@ exports.postNewPassword = (req, res, next) => {
 
     let resetUser;
 
-    User.findOne({ resetToken: token, resetTokenExpiration: {$gt: Date.now() }, _id:userId })
-        .then(user => {
-            resetUser = user;
-            return bcrypt.hash(newPassword, 12);
-        })
-        .then(hashedPassword => {
-            resetUser.password = hashedPassword;
-            resetUser.resetToken = undefined;
-            resetUser.resetTokenExpiration = undefined;
-            return resetUser.save();
-        })
-        .then(result => {
-            res.redirect('/login')
-        })
-        .catch( err => {
-            //Well when we call next with an error passed as an argument, then we actually let express know that
-            // an error occurred and it will skip all other middlewares and move right away to an error handling
-            const error = new Error(err)
-            error.httpStatusCode = 500;
-            return next(error)
-        });
+    try { 
+        
+        const user = await User.findOne({ resetToken: token, resetTokenExpiration: {$gt: Date.now() }, _id:userId })
+        
+        resetUser = user;
+        
+        const  hashedPassword = await bcrypt.hash(newPassword, 12);
+            
+        resetUser.password = hashedPassword;
+        resetUser.resetToken = undefined;
+        resetUser.resetTokenExpiration = undefined;
+        const result = await resetUser.save();
+    
+        res.redirect('/login')
+        
+    }
+    catch( err ) {
+        //Well when we call next with an error passed as an argument, then we actually let express know that
+        // an error occurred and it will skip all other middlewares and move right away to an error handling
+        const error = new Error(err)
+        error.httpStatusCode = 500;
+        return next(error)
+    };
 
 };
