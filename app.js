@@ -1,9 +1,8 @@
-/////// triger deploy 
+require('dotenv').config();
 
 const path = require('path');
 const fs = require('fs')
 const https = require('https');
-require('dotenv').config();
 
 const express = require('express');
 const bodyParser = require('body-parser');
@@ -61,8 +60,7 @@ the environment mode and if you set that to production, expressjs will change ce
 and for example, it will reduce the details for errors it throws and in general, optimize some things for deployment.
 and again hosting providers typically do that for you.*/
 
-console.log(process.env.NODE_ENV);  // go to package.json to know what is that
-
+console.log(process.env.NODE_ENV);
 
 
 const store = new MongoDBStore({
@@ -196,21 +194,12 @@ app.use((req, res, next) =>{
 
 
 
-
-
-
-
-
-
 //Now only routes starting with  /admin  will go into the admin routes file
 app.use('/admin' , adminRoutes);
 app.use(shopRoutes);
 app.use(authRoutes);
 
 app.use(errorRoutes);
-
-
-
 
 
 
@@ -243,21 +232,19 @@ app.use((error, req, res, next) => {
 
 
 
-
-
-
 mongoose
   .connect(MONGODB_URI)
   .then(result => {
 
-    // this if you wanted to configure an ssl manually on our own but when depoly the host provider manage ssl will do that for us
-          /* https.createServer({key: privateKey, cert: certificate}, app)
+    // this if you wanted to configure an ssl manually on our own but when depoly the host provider manage ssl will do that for us 
+  
+    /* 
+          https.createServer({key: privateKey, cert: certificate}, app)
            .listen(process.env.PORT || 3000 , () => {
              console.log('Server running at http://localhost:3000');
 
            });
-          */
-
+    */
 
     const PORT = process.env.PORT || 3000;
 
