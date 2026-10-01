@@ -1,7 +1,7 @@
-const { default: mongoose } = require('mongoose');
 const Product = require('../models/product.js');
 
-const fileHelper = require('../util/file.js');
+const cloudinary = require('../util/cloudinary');
+
 
 const { validationResult } = require('express-validator');
 const product = require('../models/product.js');
@@ -75,13 +75,18 @@ exports.postAddProduct =  (req, res , next ) => {
 
   console.log('here i am');
 
-  const imageUrl = '\\' + image.path;  
-
-  // or i can use this chat chat gpt tell its better one  because of the diffrent between '/' and '\'
-  //const imageUrl = '/images/' + image.filename; 
+  const imageUrl = image.path;  
 
   
-  const product = new Product({/*_id: new mongoose.Types.ObjectId('6a6fc4786bd0bc1a118fa405') , */title: title, price: price, description: description, imageUrl:imageUrl, userId: req.user._id });
+  const product = new Product(
+    {
+      title: title,
+      price: price,
+      description: description,
+      imageUrl:imageUrl,
+      imagePublicId: image.filename,
+      userId: req.user._id
+  });
 
   console.log(product);
 
@@ -220,25 +225,27 @@ exports.postEditProduct = (req, res, next) => {
       product.title = updatedTitle;
 
       // if no new image was passed or the new uploaded file was not image we simply dont set it on the object
-      if(updatedImage){
-        // remember this is from util folder
-        fileHelper.deleteFile(product.imageUrl)
+      if (updatedImage) {
+        return cloudinary.uploader.destroy(product.imagePublicId)
+        .then(result => {
+          product.imageUrl = updatedImage.path;
+          product.imagePublicId = updatedImage.filename;
+          product.price = updatedPrice;
+          product.description = updatedDescription;
 
-        product.imageUrl = '\\' + updatedImage.path;
-        
-        // or i can use this chat chat gpt tell its better one  because of the diffrent between '/' and '\'
-        //product.imageUrl = '/images/' + updatedImage.filename; 
+          return product.save();
+        });
       }
-      
-      
+
       product.price = updatedPrice;
       product.description = updatedDescription;
 
       return product.save()
-                    .then( result => {
-                      //console.log(result);
-                      res.redirect('/admin/products');
-                    });
+                    
+    })
+    .then( result => {
+      //console.log(result);
+      res.redirect('/admin/products');
     })
     .catch( err => {
       //Well when we call next with an error passed as an argument, then we actually let express know that
@@ -279,11 +286,11 @@ exports.postDeleteProduct = (req, res, next ) => {
     if(!product){
       return next(new Error('Product not found!'));
     }
-    // remember this is from util folder
-    fileHelper.deleteFile(product.imageUrl)
 
 
-    
+    return cloudinary.uploader.destroy(product.imagePublicId)
+  })
+  .then( result => {
     return Product.deleteOne({_id: prodId, userId: req.user._id}) // deleting product from the shop
 
   })
@@ -330,12 +337,12 @@ exports.deleteProduct = (req, res, next ) => {
       return next(new Error('Product not found!'));
     }
     // remember this is from util folder
-    fileHelper.deleteFile(product.imageUrl)
-
-
     
-    return Product.deleteOne({_id: prodId, userId: req.user._id}) // deleting product from the shop
+    return cloudinary.uploader.destroy(product.imagePublicId)
 
+  })
+  .then(result => {
+    return Product.deleteOne({_id: prodId, userId: req.user._id}) // deleting product from the shop
   })
   .then(result => {
     return req.user.deleteFromCart(prodId);  // deleting product from the cart if existed

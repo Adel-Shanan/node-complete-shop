@@ -2,23 +2,28 @@ require('dotenv').config();
 
 const path = require('path');
 const fs = require('fs')
-const https = require('https');
+
 
 const express = require('express');
 const bodyParser = require('body-parser');
-
 
 
 const mongoose = require('mongoose');
 const session = require('express-session');
 const MongoDBStore = require('connect-mongodb-session')(session);
 
+
 const csrf = require('csurf');
 const flash = require('connect-flash');
 
+
 const multer = require('multer');
+const { CloudinaryStorage } = require('multer-storage-cloudinary');
+const cloudinary = require('./util/cloudinary');
+
 
 const User = require('./models/user.js');
+
 
 const helmet = require('helmet');
 const compression = require('compression');
@@ -37,13 +42,18 @@ const accessLogStream = fs.createWriteStream(
 )
 */
 
-app.use(
-  helmet({
+app.use(helmet(
+  {
     contentSecurityPolicy: {
       directives: {
         "script-src": ["'self'", "https://js.stripe.com"],
         "frame-src": ["'self'", "https://js.stripe.com"],
-      },
+        "img-src": [
+          "'self'",
+          "data:",
+          "https://res.cloudinary.com"
+        ],
+      }
     },
   })
 );
@@ -76,32 +86,14 @@ const privateKey = fs.readFileSync('server.key');
 const certificate = fs.readFileSync('server.cert');
 */
 
-const imagesPath = path.join(__dirname, 'images');
 
-if (!fs.existsSync(imagesPath)) {
-    fs.mkdirSync(imagesPath);
-}
-
-
-const fileStorage = multer.diskStorage({
-  destination: (req,file,cb) => {
-    if (!fs.existsSync(imagesPath)) {
-        fs.mkdirSync(imagesPath, { recursive: true });
-    }
-    cb(null,'images');
-  },
-  filename:(req,file,cb) => {
-    cb(null, new Date().getTime() + '-' +file.originalname)
-  } 
+const storage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: 'products',
+    allowed_formats: ['jpg', 'jpeg', 'png', 'webp']
+  }
 });
-
-const fileFilter = (req,file,cb) => {
-
-  if(file.mimetype === 'image/png' || file.mimetype === 'image/jpg' || file.mimetype === 'image/jpeg'  )
-    cb(null,true);
-  else
-    cb(null,false);
-};
 
 
 app.set('view engine', 'ejs');
@@ -119,10 +111,9 @@ const errorRoutes = require('./routes/errors.js');
 
 
 app.use(bodyParser.urlencoded({extended: false}));
-app.use(multer({storage:fileStorage, fileFilter: fileFilter }).single('image'))
+app.use(multer({storage:storage}).single('image'))
 
 app.use(express.static(path.join(__dirname, 'public')));
-app.use('/images',express.static(path.join(__dirname, 'images')));
 
 
 app.use(session({secret: 'my secret', resave: false, saveUninitialized: false, store: store}))
@@ -135,15 +126,11 @@ app.use(flash());
 
 
 
-
 app.use((req, res, next) => {
   res.locals.isAuthenticated = req.session.isLoggedIn;
   res.locals.csrfToken = req.csrfToken();
   next();
 })
-
-
-
 
 
 
