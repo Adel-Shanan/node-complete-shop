@@ -11,25 +11,42 @@ const Order = require('../models/order.js');
 const ITEMS_PER_PAGE = 1;
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 exports.getProducts = async (req, res , next ) => {
 
 
  
   const page = +req.query.page || 1;
-  let totalItems;
 
   try {
 
-    const numProducts = await Product.find().countDocuments();
-
-    totalItems = numProducts;
+    const totalItems = await Product.find().countDocuments();
 
     const products = await Product.find().skip( (page - 1) * ITEMS_PER_PAGE ).limit(ITEMS_PER_PAGE);
 
     res.render('shop/products-list.ejs', {
       prods: products,
-      pageTitle:'All Products',
-      path: '/products',
+      pageTitle:'Shop',
+      path: req.path,
       currentPage: page,
       hasNextPage: ITEMS_PER_PAGE * page < totalItems,
       hasPreviousPage: page > 1,
@@ -92,53 +109,6 @@ exports.getProduct = async (req, res, next ) => {
 };
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-exports.getIndex =  async (req, res , next ) => {
-
-  const page = +req.query.page || 1;
-  let totalItems;
-
-  try { 
-    const numProducts = await Product.find().countDocuments();
-
-    totalItems = numProducts;
-
-    const products = await Product.find().skip( (page - 1) * ITEMS_PER_PAGE ).limit(ITEMS_PER_PAGE);
- 
-    res.render('shop/index.ejs', {
-      prods: products,
-      pageTitle:'Shop',
-      path: '/',
-      currentPage: page,
-      hasNextPage: ITEMS_PER_PAGE * page < totalItems,
-      hasPreviousPage: page > 1,
-      nextPage: page + 1,
-      previousPage: page - 1,
-      lastPage: Math.ceil(totalItems / ITEMS_PER_PAGE)
-    });
-  }
-  catch( err ) {
-    //Well when we call next with an error passed as an argument, then we actually let express know that
-    // an error occurred and it will skip all other middlewares and move right away to an error handling
-    const error = new Error(err)
-    error.httpStatusCode = 500;
-    return next(error)
-  };
-  
-};
 
 
 

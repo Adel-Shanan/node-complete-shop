@@ -13,7 +13,6 @@ const isAuth = require('../middleware/is-auth.js');
 
 const router = express.Router();
 
-
 // Implicitly, this route is reached under /admin/add-product for get reguests
 router.get( '/add-product', isAuth, adminController.getAddProduct );
 

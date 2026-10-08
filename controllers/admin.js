@@ -248,12 +248,7 @@ exports.postEditProduct = async (req, res, next) => {
 
 
 
-
-
-
-
-
-exports.postDeleteProduct = async (req, res, next ) => {
+exports.postDeleteProduct = async (req, res, next) => {
 
   const prodId = req.body.productId;
   
